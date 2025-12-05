@@ -30,7 +30,16 @@ export interface IEvent extends Document {
 const OrganizerSchema = new Schema<IOrganizer>(
   {
     name: { type: String, required: [true, 'Organizer name is required'], trim: true },
-    email: { type: String, required: [true, 'Organizer email is required'], trim: true },
+    email: {
+      type: String,
+      required: [true, 'Organizer email is required'],
+      trim: true,
+      lowercase: true,
+      validate: {
+        validator: (email: string) => /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email),
+        message: 'Please provide a valid organizer email address',
+      },
+    },
     organization: { type: String, required: [true, 'Organization is required'], trim: true },
     partners: [{ type: String, trim: true }],
   },
@@ -149,17 +158,25 @@ EventSchema.pre('save', function (next) {
 
 // Helper function to generate URL-friendly slug
 function generateSlug(title: string): string {
-  return title
+  const base = title
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  // Fallback for empty slugs and add uniqueness suffix
+  const slug = base || 'event';
+  return `${slug}-${Date.now().toString(36)}`;
 }
 
 // Helper function to normalize date to ISO format
 function normalizeDate(dateString: string): string {
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
   const date = new Date(dateString);
   if (isNaN(date.getTime())) {
     throw new Error('Invalid date format');
